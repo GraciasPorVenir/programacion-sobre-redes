@@ -9,7 +9,9 @@ from classes import Card, TurnRes, Slot, SlotType, TurnReq, Matrix, Hand
 class Server:
     def __init__(self):
         self.socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # WP = waiting player, el jugador que espera rival
         self.wp: Client | None = None
+        # Lock es para evitar condiciones de carrera al asignar el wp
         self.lock: threading.Lock = threading.Lock()
 
     def start(self, host: str, port: int):
@@ -20,15 +22,17 @@ class Server:
         while True:
             try:
                 client_socket, address = self.socket.accept()
-                p = Client(client_socket, address)
+                p = Client(client_socket, address) # nuevo player (p)
                 print(f"[+] Nueva conexión física desde {address}")
                 threading.Thread(target=self.matchmake, args=(p,), daemon=True).start()
             except Exception as e:
                 print(f"[-] Error en el bucle principal: {e}")
 
     def matchmake(self, p: Client):
+        """Empareja al nuevo jugador con un rival o lo pone en la lista de espera"""
         try:
             with self.lock:
+                # Si hay un WP, se lo empareja con el nuevo jugador. Si no, el nuevo jugador se vuelve el WP
                 if self.wp:
                     p.name = "Jugador 2"
                     threading.Thread(
@@ -149,8 +153,8 @@ class Server:
 
     def _toggle_turns(
         self,
-        ap: Client,
-        wp: Client,
+        ap: Client, # AP = Active player, el jugador que está moviendo su turno
+        wp: Client, # WP = Waiting player, el jugador que está esperando su turno
         matrix: Matrix,
         turn_hand: tuple[list[Card], list[Card]] | tuple[Card, Card],
         winner: str = "",

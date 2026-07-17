@@ -8,6 +8,7 @@ type Matrix = list[list["Slot"]]
 
 
 class SlotType(enum.IntEnum):
+    """Determina que tipo de celda va a ser un Slot (Jugable, borde, gema o slot no jugable)"""
     NO_SLOT = 0
     BORDER = 1
     NORMAL = 2
@@ -16,11 +17,12 @@ class SlotType(enum.IntEnum):
 
 @dataclass(frozen=True)
 class Card:
+    """La carta del jugador. Incluye sus direcciones y a quién le pertenece."""
     directions: list[tuple[int, int] | None]  # Corregido a tuple
     player: str
 
     def __post_init__(self):
-        # JSON deserializa tuplas como listas; normalizamos a tuplas siempre
+        # JSON deserializa tuplas como listas
         object.__setattr__(
             self,
             "directions",
@@ -39,6 +41,7 @@ class Card:
 
 @dataclass
 class Slot:
+    """Un espacio en donde puede ir la carta"""
     type: SlotType
     card: Card | None = None
 
@@ -50,6 +53,7 @@ class Slot:
 
 @dataclass
 class TurnReq:
+    """La solicitud de movimiento en cada turno. Incluye la carta a mover, la matriz actual, la posición final (x, y), la dirección a la que se empuja V(x, y) y si el movimiento fue producido por un jugador o por empuje."""
     card: Card
     matrix: Matrix
     x: int
@@ -107,6 +111,7 @@ class MixIn:
 
 @dataclass(frozen=True, kw_only=True)
 class Hand(MixIn):
+    """Las manos del rival y la propia, la matriz y de quién es el turno. Se usa solo al comienzo de la partida."""
     hand: list[Card]
     rhand: list[Card]
 
@@ -129,6 +134,7 @@ class Hand(MixIn):
 
 @dataclass(frozen=True, kw_only=True)
 class TurnRes(MixIn):
+    """Devuelve la carta que se movió, la nueva carta en la mano, la nueva matriz tras el movmiento y de quién es el turno."""
     newcard: Card
     precard: Card
 
