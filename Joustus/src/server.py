@@ -90,6 +90,14 @@ class Server:
             return True
 
     def _valid_movements(self, matrix: Matrix) -> bool:
+        # TODO (issue conocida): la partida puede no terminar nunca.
+        # _execute_movement borra la celda en `prev_pos = (x-vx, y-vy)`. Para
+        # colocaciones directas desde la mano, si no existe una dirección cuyo
+        # prev_pos caiga en un borde o fuera del tablero (ej. celda central 2,2),
+        # se borra una carta de otra celda NORMAL, lo que vuelve a liberar espacio
+        # y mantiene _valid_movements = True indefinidamente.
+        # Solución pendiente: en _execute_movement, cuando is_pushed=False y la
+        # carta viene de la mano (no del tablero), NO borrar prev_pos.
         for x in range(1, 4):
             for y in range(1, 4):
                 slot: Slot = matrix[x][y]
@@ -160,10 +168,12 @@ class Server:
                 turn = False
             data = {"matrix": matrix, "turn": turn, "message": msg}
             pos1, pos2 = turn_hand
-            if type(pos1) == Card and type(pos2) == Card:
+            if isinstance(pos1, Card) and isinstance(pos2, Card):
                 res = TurnRes(newcard=pos1, precard=pos2, **data)
-            elif type(pos1) == list[Card] and type(pos2) == list[Card]:
-                if p == ap:
+            elif isinstance(pos1, list) and isinstance(pos2, list):
+                # pos1 = mano de p1 (ap), pos2 = mano de p2 (wp)
+                # Cada jugador recibe su propia mano como 'hand' y la del rival como 'rhand'
+                if p == wp:
                     pos1, pos2 = pos2, pos1
                 res = Hand(hand=pos1, rhand=pos2, **data)
             else:
@@ -207,8 +217,8 @@ class Server:
                     winner = self._handle_endgame(matrix)
                     is_playing = False
                 new_card = Card.create(ap.name)
+                ap, wp = wp, ap          # intercambia ANTES de notificar
                 self._toggle_turns(ap, wp, matrix, (new_card, req.card), winner)
-                ap, wp = wp, ap
         except Exception as e:
             print(e)
         finally:

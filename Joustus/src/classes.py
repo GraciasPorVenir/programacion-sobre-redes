@@ -19,6 +19,14 @@ class Card:
     directions: list[tuple[int, int] | None]  # Corregido a tuple
     player: str
 
+    def __post_init__(self):
+        # JSON deserializa tuplas como listas; normalizamos a tuplas siempre
+        object.__setattr__(
+            self,
+            "directions",
+            [tuple(d) if d is not None else None for d in self.directions],
+        )
+
     @classmethod
     def create(cls, player: str):
         d = [(0, 1), (1, 0), (0, -1), (-1, 0)]
