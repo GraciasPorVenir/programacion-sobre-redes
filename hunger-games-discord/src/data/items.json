@@ -1,0 +1,12 @@
+{
+  "category": {
+    "item_name": {
+      "weight": 0,
+      "durability": 0,
+      "points": 0,
+      "craft": {
+        "item_name": 0
+      }
+    }
+  }
+}

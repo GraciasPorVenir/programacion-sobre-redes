@@ -1,0 +1,12 @@
+{
+  "wildlife_name": {
+    "life": 0,
+    "damage": 0,
+    "danger": [0, 0],
+    "temperature": [0, 0],
+    "humidity": [0, 0],
+    "loot": {
+      "item_name": 0
+    }
+  }
+}
