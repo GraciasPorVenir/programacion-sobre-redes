@@ -1,12 +1,33 @@
 {
-  "category": {
-    "item_name": {
-      "weight": 0,
-      "durability": 0,
-      "points": 0,
-      "craft": {
-        "item_name": 0
-      }
+  "MAP": {
+    "brujula": {
+      "data": {
+        "weight": 1,
+        "uses": 20,
+        "points": 100
+      },
+      "craft": {},
+      "min_luck": 50
+    },
+    "mapa": {
+      "data": {
+        "weight": 1,
+        "uses": 20,
+        "points": 100
+      },
+      "craft": {},
+      "min_luck": 50
+    }
+  },
+  "STORAGE": {
+    "baul": {
+      "data": {
+        "weight": 3,
+        "uses": 25,
+        "points": 50
+      },
+      "craft": {},
+      "min_luck": 50
     }
   }
 }

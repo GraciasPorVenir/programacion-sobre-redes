@@ -1,0 +1,9 @@
+{
+  "edition": {
+    "user_id": {
+      "dead_at": "timestamp",
+      "death_reason": "",
+      "kills": []
+    }
+  }
+}
