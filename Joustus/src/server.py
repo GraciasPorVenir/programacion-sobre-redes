@@ -9,9 +9,7 @@ from classes import Card, TurnRes, Slot, SlotType, TurnReq, Matrix, Hand
 class Server:
     def __init__(self):
         self.socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # WP = waiting player, el jugador que espera rival
         self.wp: Client | None = None
-        # Lock es para evitar condiciones de carrera al asignar el wp
         self.lock: threading.Lock = threading.Lock()
 
     def start(self, host: str, port: int):
@@ -22,23 +20,24 @@ class Server:
         while True:
             try:
                 client_socket, address = self.socket.accept()
-                p = Client(client_socket, address) # nuevo player (p)
+                p = Client(client_socket, address)
                 print(f"[+] Nueva conexión física desde {address}")
                 threading.Thread(target=self.matchmake, args=(p,), daemon=True).start()
             except Exception as e:
                 print(f"[-] Error en el bucle principal: {e}")
 
     def matchmake(self, p: Client):
-        """Empareja al nuevo jugador con un rival o lo pone en la lista de espera"""
         try:
             with self.lock:
-                # Si hay un WP, se lo empareja con el nuevo jugador. Si no, el nuevo jugador se vuelve el WP
                 if self.wp:
-                    p.name = "Jugador 2"
-                    threading.Thread(
-                        target=self._handle_game, args=(self.wp, p)
-                    ).start()
+                    p1 = self.wp
+                    p2 = p
+                    p1.name = "Jugador 1"
+                    p2.name = "Jugador 2"
                     self.wp = None
+                    threading.Thread(
+                        target=self._handle_game, args=(p1, p2)
+                    ).start()
                 else:
                     p.name = "Jugador 1"
                     self.wp = p
@@ -94,14 +93,6 @@ class Server:
             return True
 
     def _valid_movements(self, matrix: Matrix) -> bool:
-        # TODO (issue conocida): la partida puede no terminar nunca.
-        # _execute_movement borra la celda en `prev_pos = (x-vx, y-vy)`. Para
-        # colocaciones directas desde la mano, si no existe una dirección cuyo
-        # prev_pos caiga en un borde o fuera del tablero (ej. celda central 2,2),
-        # se borra una carta de otra celda NORMAL, lo que vuelve a liberar espacio
-        # y mantiene _valid_movements = True indefinidamente.
-        # Solución pendiente: en _execute_movement, cuando is_pushed=False y la
-        # carta viene de la mano (no del tablero), NO borrar prev_pos.
         for x in range(1, 4):
             for y in range(1, 4):
                 slot: Slot = matrix[x][y]
@@ -109,7 +100,7 @@ class Server:
                     return True
                 if slot.card is not None:
                     for d in slot.card.directions:
-                        if d != None:
+                        if d is not None:
                             nx, ny = (x + d[0], y + d[1])
                             mv = TurnReq(slot.card, matrix, nx, ny, d[0], d[1])
                             if self._check_movement(mv):
@@ -153,8 +144,8 @@ class Server:
 
     def _toggle_turns(
         self,
-        ap: Client, # AP = Active player, el jugador que está moviendo su turno
-        wp: Client, # WP = Waiting player, el jugador que está esperando su turno
+        ap: Client,
+        wp: Client,
         matrix: Matrix,
         turn_hand: tuple[list[Card], list[Card]] | tuple[Card, Card],
         winner: str = "",
@@ -175,8 +166,6 @@ class Server:
             if isinstance(pos1, Card) and isinstance(pos2, Card):
                 res = TurnRes(newcard=pos1, precard=pos2, **data)
             elif isinstance(pos1, list) and isinstance(pos2, list):
-                # pos1 = mano de p1 (ap), pos2 = mano de p2 (wp)
-                # Cada jugador recibe su propia mano como 'hand' y la del rival como 'rhand'
                 if p == wp:
                     pos1, pos2 = pos2, pos1
                 res = Hand(hand=pos1, rhand=pos2, **data)
@@ -221,7 +210,7 @@ class Server:
                     winner = self._handle_endgame(matrix)
                     is_playing = False
                 new_card = Card.create(ap.name)
-                ap, wp = wp, ap          # intercambia ANTES de notificar
+                ap, wp = wp, ap
                 self._toggle_turns(ap, wp, matrix, (new_card, req.card), winner)
         except Exception as e:
             print(e)

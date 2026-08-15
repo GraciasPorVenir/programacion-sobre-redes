@@ -7,7 +7,6 @@ Ejemplo:  python3 game.py 127.0.0.1 8091
 import os
 import sys
 
-# Asegura que src/ esté en sys.path sin importar el CWD
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import threading
@@ -20,9 +19,9 @@ W, H  = 960, 700
 FPS   = 60
 
 # ── Tablero ──────────────────────────────────────────────────────────────────
-CELL      = 78           # px por celda
-BOARD_X   = 50           # origen del tablero en x
-BOARD_Y   = 105          # origen del tablero en y
+CELL      = 78
+BOARD_X   = 50
+BOARD_Y   = 105
 
 # ── Carta en mano ────────────────────────────────────────────────────────────
 CW, CH = 130, 90
@@ -88,10 +87,13 @@ class JoustusGUI:
         self.valid_moves : list[tuple] = []  # (r, c, vx, vy)
         self.anim_tick   = 0
 
+        # Botón volver a jugar
+        self.btn_replay_rect = pygame.Rect(W // 2 - 110, H // 2 + 40, 220, 50)
+
         # Reconexión
         self._host       = "127.0.0.1"
         self._port       = 8091
-        self._recon_at   = 0.0   # timestamp cuando termina el countdown
+        self._recon_at   = 0.0
 
     # ── Red ──────────────────────────────────────────────────────────────────
 
@@ -138,9 +140,10 @@ class JoustusGUI:
             return
 
         if data.get("_lost"):
-            self.message = "Conexión perdida. Reconectando…"
-            self._reset_game()
-            self._schedule_reconnect(5)
+            if self.state != St.GAME_OVER:
+                self.message = "Conexión perdida. Reconectando…"
+                self._reset_game()
+                self._schedule_reconnect(5)
             return
 
         if "hand" in data:
@@ -166,7 +169,6 @@ class JoustusGUI:
         self.matrix  = tr.matrix
         self.message = tr.message
 
-        # Actualizar mano propia u oponente según quién jugó
         if tr.precard.player == self.my_name:
             for i, c in enumerate(self.hand):
                 if c.directions == tr.precard.directions:
@@ -201,12 +203,10 @@ class JoustusGUI:
         for r in range(5):
             for c in range(5):
                 slot = self.matrix[r][c]
-                # Colocación directa en celda NORMAL vacía
                 if slot.card is None and slot.type == SlotType.NORMAL:
                     vx, vy = self._safe_dir(r, c)
                     moves.append((r, c, vx, vy))
                     continue
-                # Empuje desde celda con carta
                 if slot.card is not None:
                     for d in card.directions:
                         if d is None:
@@ -218,21 +218,19 @@ class JoustusGUI:
                         tslot = self.matrix[nx][ny]
                         if tslot.type == SlotType.NO_SLOT:
                             continue
-                        # Verificar que la carta del destino no bloquea
                         if tslot.card and (-vx, -vy) in [tuple(x) for x in tslot.card.directions if x]:
                             continue
                         moves.append((nx, ny, vx, vy))
         return moves
 
     def _safe_dir(self, r: int, c: int) -> tuple:
-        """Dirección de entrada segura para no borrar celdas con cartas."""
         for vx, vy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
             pr, pc = r - vx, c - vy
             if pr < 0 or pr >= 5 or pc < 0 or pc >= 5:
                 return vx, vy
             if self.matrix[pr][pc].type in (SlotType.BORDER, SlotType.NO_SLOT):
                 return vx, vy
-        return 1, 0  # fallback
+        return 1, 0
 
     def _send_move(self, card: Card, r: int, c: int, vx: int, vy: int):
         req = TurnReq(card=card, matrix=self.matrix, x=r, y=c, vx=vx, vy=vy)
@@ -245,11 +243,17 @@ class JoustusGUI:
     # ── Manejo de eventos ────────────────────────────────────────────────────
 
     def _on_click(self, pos):
+        if self.state == St.GAME_OVER:
+            if self.btn_replay_rect.collidepoint(pos):
+                self.client.disconnect()
+                self._reset_game()
+                self.connect(self._host, self._port)
+            return
+
         if self.state != St.MY_TURN:
             return
         mx, my = pos
 
-        # Clic en mano del jugador (inferior)
         hand_y = H - 110
         for i, card in enumerate(self.hand):
             cx = 30 + i * (CW + 18)
@@ -261,7 +265,6 @@ class JoustusGUI:
                     self.valid_moves = self._compute_valid(card)
                 return
 
-        # Clic en tablero
         if self.sel is not None:
             bc = (mx - BOARD_X) // CELL
             br = (my - BOARD_Y) // CELL
@@ -301,7 +304,6 @@ class JoustusGUI:
         y = BOARD_Y + r * CELL
         rect = pygame.Rect(x + 1, y + 1, CELL - 2, CELL - 2)
 
-        # Fondo según tipo
         if slot.type == SlotType.NO_SLOT:
             col = C_NOSLOT
         elif slot.type == SlotType.BORDER:
@@ -311,7 +313,6 @@ class JoustusGUI:
         else:
             col = C_NORMAL
 
-        # Resaltado de movimiento válido
         in_valid = any(vr == r and vc == c for vr, vc, _, _ in self.valid_moves)
         if in_valid:
             pulse = abs((self.anim_tick % 60) - 30) / 30
@@ -320,14 +321,12 @@ class JoustusGUI:
         pygame.draw.rect(self.screen, col, rect, border_radius=7)
         pygame.draw.rect(self.screen, (70, 70, 110), rect, 1, border_radius=7)
 
-        # Ícono de gema
         if slot.type == SlotType.GEM:
             cx, cy = x + CELL // 2, y + CELL // 2
             pts = [(cx, cy - 14), (cx + 12, cy), (cx, cy + 14), (cx - 12, cy)]
             pygame.draw.polygon(self.screen, C_GOLD, pts)
             pygame.draw.polygon(self.screen, (255, 240, 100), pts, 1)
 
-        # Carta en la celda
         if slot.card:
             self._draw_board_card(slot.card, x, y)
 
@@ -412,12 +411,23 @@ class JoustusGUI:
 
     def _draw_overlay(self):
         surf = pygame.Surface((W, H), pygame.SRCALPHA)
-        surf.fill((0, 0, 0, 160))
+        surf.fill((0, 0, 0, 180))
         self.screen.blit(surf, (0, 0))
+        
         msg = self.f_xl.render(self.message, True, C_GOLD)
-        self.screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 30))
-        hint = self.f_md.render("Cerrá la ventana para salir.", True, C_TEXT)
-        self.screen.blit(hint, (W // 2 - hint.get_width() // 2, H // 2 + 20))
+        self.screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 50))
+
+        # Dibujo del botón "Volver a jugar"
+        mouse_pos = pygame.mouse.get_pos()
+        is_hover = self.btn_replay_rect.collidepoint(mouse_pos)
+        btn_col = (40, 160, 90) if is_hover else (30, 120, 70)
+        
+        pygame.draw.rect(self.screen, btn_col, self.btn_replay_rect, border_radius=8)
+        pygame.draw.rect(self.screen, C_CYAN if is_hover else C_TEXT, self.btn_replay_rect, 2, border_radius=8)
+        
+        btn_txt = self.f_lg.render("Volver a jugar", True, (255, 255, 255))
+        self.screen.blit(btn_txt, (self.btn_replay_rect.x + (self.btn_replay_rect.width - btn_txt.get_width()) // 2,
+                                   self.btn_replay_rect.y + (self.btn_replay_rect.height - btn_txt.get_height()) // 2))
 
     def _draw_waiting(self):
         t1 = self.f_xl.render(self.message, True, C_GOLD)
@@ -457,7 +467,6 @@ class JoustusGUI:
 
             self._flush()
 
-            # Reconexión automática cuando se acaba el countdown
             import time
             if self.state == St.RECONNECTING and time.monotonic() >= self._recon_at:
                 self.connect(self._host, self._port)

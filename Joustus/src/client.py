@@ -23,6 +23,8 @@ class Client:
 
     def connect(self, host: str, port: int) -> bool:
         try:
+            # Creamos un socket nuevo por si estamos reconectando tras el fin de una partida
+            self.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
             self.socket.connect((host, port))
             self.address = (host, port)
             self._init_streams()
@@ -46,21 +48,23 @@ class Client:
                 return None
             raw = self.rfile.readline()
             if not raw:
-                raise ConnectionAbortedError(
-                    "La conexión fue cerrada por el extremo remoto."
-                )
+                return None
             return json.loads(raw)
-        except Exception as e:
-            print(f"[-] Error al recibir de {self.address}: {e}")
+        except Exception:
             return None
 
     def disconnect(self):
         try:
+            if self.socket:
+                try:
+                    self.socket.shutdown(sock.SHUT_RDWR)
+                except Exception:
+                    pass
+                self.socket.close()
             if self.rfile:
                 self.rfile.close()
             if self.wfile:
                 self.wfile.close()
-            self.socket.close()
             print(f"[#] Conexión cerrada limpiamente con {self.address}")
         except Exception as e:
             print(f"[-] Error al desconectar a {self.address}: {e}")
