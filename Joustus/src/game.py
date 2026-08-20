@@ -57,43 +57,72 @@ class St:
 # ── Juego principal ──────────────────────────────────────────────────────────
 class JoustusGUI:
 
-    def __init__(self):
-        pygame.init()
-        self.screen = pygame.display.set_mode((W, H))
-        pygame.display.set_caption("Joustus — Programación sobre Redes")
-        self.clock  = pygame.time.Clock()
+    def __init__(self): 
+        pygame.init() 
+        pygame.mixer.init() 
+        
+        self.screen = pygame.display.set_mode((W, H), pygame.SCALED) 
+        pygame.display.set_caption("Joustus — Programación sobre Redes") 
+        self.clock  = pygame.time.Clock() 
 
-        # Fuentes
-        self.f_xl = pygame.font.SysFont("segoeui", 30, bold=True)
-        self.f_lg = pygame.font.SysFont("segoeui", 22, bold=True)
-        self.f_md = pygame.font.SysFont("segoeui", 18)
-        self.f_sm = pygame.font.SysFont("segoeui", 14)
+        # Botones del menu
+        btn_x = W - 180
+        self.rect_btn_fs   = pygame.Rect(btn_x, 140, 150, 40)
+        
+        # Slider del menu
+        self.rect_slider_vol = pygame.Rect(btn_x, 220, 150, 20)
+        self.is_dragging_vol = False
+        
+        self.rect_btn_quit = pygame.Rect(btn_x, H - 80, 150, 40)
 
-        # Red
-        self.client    = Client()
-        self._incoming = None
-        self._lock     = threading.Lock()
+        # Fuentes 
+        self.f_xl = pygame.font.SysFont("segoeui", 30, bold=True) 
+        self.f_lg = pygame.font.SysFont("segoeui", 22, bold=True) 
+        self.f_md = pygame.font.SysFont("segoeui", 18) 
+        self.f_sm = pygame.font.SysFont("segoeui", 14) 
 
-        # Estado del juego
-        self.state   = St.CONNECTING
-        self.message = "Conectando al servidor…"
-        self.matrix  = None
-        self.hand  : list[Card] = []
-        self.rhand : list[Card] = []
-        self.my_name = ""
+        # Red 
+        self.client    = Client() 
+        self._incoming = None 
+        self._lock     = threading.Lock() 
 
-        # Interacción
-        self.sel         = None   # índice en self.hand
-        self.valid_moves : list[tuple] = []  # (r, c, vx, vy)
-        self.anim_tick   = 0
+        # Estado del juego 
+        self.state   = St.CONNECTING 
+        self.message = "Conectando al servidor…" 
+        self.matrix  = None 
+        self.hand  : list[Card] = [] 
+        self.rhand : list[Card] = [] 
+        self.my_name = "" 
 
-        # Botón volver a jugar
-        self.btn_replay_rect = pygame.Rect(W // 2 - 110, H // 2 + 40, 220, 50)
+        # Interacción 
+        self.sel         = None   # índice en self.hand 
+        self.valid_moves : list[tuple] = []  # (r, c, vx, vy) 
+        self.anim_tick   = 0 
 
-        # Reconexión
-        self._host       = "127.0.0.1"
-        self._port       = 8091
-        self._recon_at   = 0.0
+        # Botón volver a jugar 
+        self.btn_replay_rect = pygame.Rect(W // 2 - 110, H // 2 + 40, 220, 50) 
+
+        # Reconexión 
+        self._host       = "127.0.0.1" 
+        self._port       = 8091 
+        self._recon_at   = 0.0 
+
+        # Variables del menú lateral
+        self.is_fullscreen = False
+        self.volume = 0.5  # Va de 0.0 a 1.0
+        
+        # Posiciones de los botones a la derecha (x, y, ancho, alto)
+        btn_x = W - 180
+        self.rect_btn_fs   = pygame.Rect(btn_x, 140, 150, 40)
+        self.rect_btn_vold = pygame.Rect(btn_x, 220, 70, 40)
+        self.rect_btn_volu = pygame.Rect(btn_x + 80, 220, 70, 40)
+        self.rect_btn_quit = pygame.Rect(btn_x, H - 80, 150, 40)
+
+    def _update_volume(self, mouse_x):
+        rel_x = mouse_x - self.rect_slider_vol.x
+        ratio = rel_x / self.rect_slider_vol.width
+        self.volume = max(0.0, min(1.0, ratio))
+        # pygame.mixer.music.set_volume(self.volume)
 
     # ── Red ──────────────────────────────────────────────────────────────────
 
@@ -443,55 +472,137 @@ class JoustusGUI:
         self.screen.blit(t1, (W // 2 - t1.get_width() // 2, H // 2 - 30))
         self.screen.blit(t2, (W // 2 - t2.get_width() // 2, H // 2 + 20))
 
-    # ── Loop principal ───────────────────────────────────────────────────────
+    def _draw_menu(self):
+        # Dibujar un panel oscuro a la derecha
+        panel_rect = pygame.Rect(W - 210, 90, 210, H - 90)
+        pygame.draw.rect(self.screen, (20, 18, 40), panel_rect)
+        pygame.draw.line(self.screen, (50, 50, 80), (W - 210, 90), (W - 210, H), 1)
 
-    def run(self, host="127.0.0.1", port=8091):
-        self.connect(host, port)
+        # Título del menú
+        t_menu = self.f_md.render("MENÚ", True, C_GOLD)
+        self.screen.blit(t_menu, (W - 210 + (210 - t_menu.get_width()) // 2, 105))
 
-        running = True
-        while running:
-            self.screen.fill(BG)
-            self.anim_tick += 1
+        # Función auxiliar para dibujar botones con efecto "hover" (iluminar al pasar el mouse)
+        mouse_pos = pygame.mouse.get_pos()
+        def draw_btn(rect, text):
+            is_hover = rect.collidepoint(mouse_pos)
+            bg_col = C_SEL if is_hover else (35, 35, 60)
+            bdr_col = C_CYAN if is_hover else C_BORDER
+            
+            pygame.draw.rect(self.screen, bg_col, rect, border_radius=6)
+            pygame.draw.rect(self.screen, bdr_col, rect, 1, border_radius=6)
+            
+            surf = self.f_sm.render(text, True, (240, 240, 240))
+            self.screen.blit(surf, (rect.x + (rect.width - surf.get_width()) // 2, 
+                                    rect.y + (rect.height - surf.get_height()) // 2))
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                    break
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self._on_click(event.pos)
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        # Botón Pantalla Completa
+        fs_label = "Ventana" if self.is_fullscreen else "Pantalla Completa"
+        draw_btn(self.rect_btn_fs, fs_label)
+
+        # ── NUEVO: Dibujo del Slider de Volumen ──
+        vol_text = self.f_sm.render(f"Volumen: {int(self.volume * 100)}%", True, C_TEXT)
+        self.screen.blit(vol_text, (self.rect_btn_fs.x, 195))
+        
+        # Fondo oscuro de la barra
+        pygame.draw.rect(self.screen, (35, 35, 60), self.rect_slider_vol, border_radius=10)
+        pygame.draw.rect(self.screen, C_BORDER, self.rect_slider_vol, 1, border_radius=10)
+        
+        # Relleno de color que indica el nivel de volumen
+        fill_w = int(self.volume * self.rect_slider_vol.width)
+        if fill_w > 0:
+            fill_rect = pygame.Rect(self.rect_slider_vol.x, self.rect_slider_vol.y, fill_w, self.rect_slider_vol.height)
+            pygame.draw.rect(self.screen, C_CYAN, fill_rect, border_radius=10)
+            
+        # Perilla arrastrable
+        knob_x = self.rect_slider_vol.x + fill_w
+        knob_y = self.rect_slider_vol.centery
+        pygame.draw.circle(self.screen, (240, 240, 240), (knob_x, knob_y), 9)
+
+        # Botón Salir
+        draw_btn(self.rect_btn_quit, "Salir del Juego")
+
+
+    # ── Loop principal ─────────────────────────────────────────────────────── 
+
+    def run(self, host="127.0.0.1", port=8091): 
+        self.connect(host, port) 
+
+        running = True 
+        while running: 
+            self.screen.fill(BG) 
+            self.anim_tick += 1 
+
+            for event in pygame.event.get(): 
+                if event.type == pygame.QUIT: 
+                    running = False 
+                    break 
+                
+                # Clic del mouse presionado
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1: 
+                    pos = event.pos
+
+                    if self.rect_btn_fs.collidepoint(pos):
+                        self.is_fullscreen = not self.is_fullscreen
+                        # Combinamos SCALED para que no se deforme la imagen
+                        flags = pygame.SCALED | (pygame.FULLSCREEN if self.is_fullscreen else 0)
+                        self.screen = pygame.display.set_mode((W, H), flags)
+
+                    elif self.rect_slider_vol.collidepoint(pos):
+                        self.is_dragging_vol = True
+                        self._update_volume(pos[0])
+
+                    elif self.rect_btn_quit.collidepoint(pos):
+                        running = False
+
+                    else:
+                        self._on_click(pos) 
+
+                # Clic del mouse soltado (para dejar de arrastrar el slider)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    self.is_dragging_vol = False
+
+                # Movimiento del mouse (mientras arrastramos)
+                elif event.type == pygame.MOUSEMOTION:
+                    if self.is_dragging_vol:
+                        self._update_volume(event.pos[0])
+
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: 
                     self.sel, self.valid_moves = None, []
 
-            if not running:
-                break
+            if not running: 
+                break 
 
-            self._flush()
+            self._flush() 
 
-            import time
-            if self.state == St.RECONNECTING and time.monotonic() >= self._recon_at:
-                self.connect(self._host, self._port)
+            import time 
+            if self.state == St.RECONNECTING and time.monotonic() >= self._recon_at: 
+                self.connect(self._host, self._port) 
 
-            self._draw_hud()
+            self._draw_hud() 
 
-            if self.state in (St.CONNECTING, St.WAITING):
-                self._draw_waiting()
-            elif self.state == St.RECONNECTING:
-                self._draw_reconnecting()
-            else:
-                self._draw_board()
-                self._draw_player_hand()
-                self._draw_rhand()
-                self._draw_legend()
-                self._draw_instructions()
+            if self.state in (St.CONNECTING, St.WAITING): 
+                self._draw_waiting() 
+            elif self.state == St.RECONNECTING: 
+                self._draw_reconnecting() 
+            else: 
+                self._draw_board() 
+                self._draw_player_hand() 
+                self._draw_rhand() 
+                self._draw_legend() 
+                self._draw_instructions() 
 
-            if self.state == St.GAME_OVER:
-                self._draw_overlay()
+            # Menu en pantalla 
+            self._draw_menu()
 
-            pygame.display.flip()
-            self.clock.tick(FPS)
+            if self.state == St.GAME_OVER: 
+                self._draw_overlay() 
 
-        self.client.disconnect()
-        pygame.quit()
+            pygame.display.flip() 
+            self.clock.tick(FPS) 
+
+        self.client.disconnect() 
+        pygame.quit() 
         sys.exit(0)
 
 

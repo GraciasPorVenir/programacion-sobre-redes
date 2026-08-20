@@ -110,20 +110,19 @@ class Server:
     def _execute_movement(self, mv: TurnReq) -> Matrix:
         mlen = len(mv.matrix)
         prev_card: Card | None = None
+        
         if (0 <= mv.x < mlen) and (0 <= mv.y < mlen):
             prev_card = mv.matrix[mv.x][mv.y].card
-            if mv.matrix[mv.x][mv.y].type != SlotType.NO_SLOT:
-                mv.matrix[mv.x][mv.y].card = mv.card
-
-        if not mv.is_pushed:
-            px, py = mv.get_prev_pos()
-            if (0 <= px < mlen) and (0 <= py < mlen):
-                mv.matrix[px][py].card = None
 
         if prev_card:
             nx, ny = mv.get_next_pos()
             next_mv = TurnReq(prev_card, mv.matrix, nx, ny, mv.vx, mv.vy, True)
-            return self._execute_movement(next_mv)
+            self._execute_movement(next_mv)
+            
+        if (0 <= mv.x < mlen) and (0 <= mv.y < mlen):
+            if mv.matrix[mv.x][mv.y].type != SlotType.NO_SLOT:
+                mv.matrix[mv.x][mv.y].card = mv.card
+
         return mv.matrix
 
     def _handle_endgame(self, matrix: Matrix) -> str:
