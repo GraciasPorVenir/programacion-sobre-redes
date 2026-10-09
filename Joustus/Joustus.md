@@ -44,9 +44,10 @@ En cada turno, el jugador debe poner una carta de su mano (respetando las reglas
 
 El jugador no solo puede poner cartas en celdas libres, sino que también puede desplazar otras cartas a las celdas condicionadas mediante empuje. El empuje precisa de las siguientes condiciones:
 
-* La carta a poner tenga entre sus direcciones la dirección a la que se prentende empujar (por ejemplo, | ← ↑ → | puede empujar a la izquierda, a la derecha y arriba)
-* Todas las cartas que se encuentren en la trayectoria del empuje __no__ pueden tener la dirección opuesta al empuje (por ejemplo, si se quiere empujar hacia arriba pero en la columna hay una carta con dirección hacia abajo, no se efectuará el movimiento)
-* La pila de la columna o fila de la trayectoría no puede estar saturada (es decir, mientras la celda de descarte al final de la columna o fila esté libre, los movimientos serán válidos)
+* Al ser colocada sobre una casilla libre, la carta se empuja a sí misma y a toda la fila de cartas en la dirección indicada. Todas las cartas involucradas en el tren de empuje saltan 1 casilla simultáneamente.
+* La carta a poner debe tener entre sus direcciones la dirección a la que se pretende empujar (por ejemplo, | ← ↑ → | puede iniciar un empuje hacia la izquierda, derecha o arriba).
+* Todas las cartas que se encuentren en la trayectoria del empuje **no** pueden tener la dirección opuesta al empuje (por ejemplo, si se empuja la fila hacia abajo, pero una de las cartas arrastradas tiene una flecha apuntando hacia arriba, el movimiento se considera inválido).
+* La pila de la columna o fila de la trayectoria no puede estar saturada (es decir, mientras la celda final de la trayectoria no sobrepase los límites del tablero —como bordes o esquinas prohibidas—, el movimiento será válido).
 
 Al final del movimiento, se repone una carta nueva a la mano.
 
