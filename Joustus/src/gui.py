@@ -87,23 +87,49 @@ def network_thread(client):
             state_queue.put({"type": "DISCONNECT"})
             break
 
+def start_game_mode(extra_row=0, extra_col=0, extra_gem=0):
+    global game_state, c, current_state
+    game_state = get_initial_game_state()
+    if c: 
+        try: c.disconnect() 
+        except: pass
+    
+    c = connect_client()
+    if not c:
+        game_state["message"] = "Error al conectar"
+        game_state["disconnected"] = True
+    else:
+        try: c.send({"type": "INIT_MODE", "extra_row": extra_row, "extra_col": extra_col, "extra_gem": extra_gem})
+        except: pass
+        
+    current_state = "GAME"
+
 def draw_menu():
     screen.fill(BG_COLOR)
     title = big_font.render("JOUSTUS", True, GEM_COLOR)
     screen.blit(title, (WIDTH//2 - title.get_width()//2, 100))
     
-    play_rect = pygame.Rect(WIDTH//2 - 100, 230, 200, 50)
-    settings_rect = pygame.Rect(WIDTH//2 - 100, 300, 200, 50)
-    rules_rect = pygame.Rect(WIDTH//2 - 100, 370, 200, 50)
-    exit_rect = pygame.Rect(WIDTH//2 - 100, 440, 200, 50)
+    normal_rect = pygame.Rect(WIDTH//2 - 100, 200, 200, 50)
+    extended_rect = pygame.Rect(WIDTH//2 - 100, 270, 200, 50)
+    settings_rect = pygame.Rect(WIDTH//2 - 100, 340, 200, 50)
+    rules_rect = pygame.Rect(WIDTH//2 - 100, 410, 200, 50)
+    exit_rect = pygame.Rect(WIDTH//2 - 100, 480, 200, 50)
     
-    for rect, text in [(play_rect, "Jugar"), (settings_rect, "Configuración"), (rules_rect, "Reglas"), (exit_rect, "Salir")]:
+    buttons = [
+        (normal_rect, "Modo Normal"),
+        (extended_rect, "Modo Extendido"),
+        (settings_rect, "Configuración"),
+        (rules_rect, "Reglas"),
+        (exit_rect, "Salir")
+    ]
+    
+    for rect, text in buttons:
         pygame.draw.rect(screen, (50, 50, 60), rect, border_radius=5)
         pygame.draw.rect(screen, (100, 100, 120), rect, 2, border_radius=5)
         txt = title_font.render(text, True, TEXT_COLOR)
         screen.blit(txt, (rect.x + rect.width//2 - txt.get_width()//2, rect.y + 12))
         
-    return play_rect, settings_rect, rules_rect, exit_rect
+    return normal_rect, extended_rect, settings_rect, rules_rect, exit_rect
 
 def draw_rules():
     screen.fill(BG_COLOR)
@@ -174,8 +200,12 @@ def apply_resolution(w, h, full):
 
 def draw_game():
     screen.fill(BG_COLOR)
-    BOARD_X = WIDTH//2 - (CELL_SIZE*5)//2
-    BOARD_Y = HEIGHT//2 - (CELL_SIZE*5)//2 - 20
+    
+    rows = len(game_state["matrix"]) if game_state["matrix"] else 5
+    cols = len(game_state["matrix"][0]) if game_state["matrix"] and len(game_state["matrix"]) > 0 else 5
+    
+    BOARD_X = WIDTH//2 - (CELL_SIZE*cols)//2
+    BOARD_Y = HEIGHT//2 - (CELL_SIZE*rows)//2 - 20
     
     lines = game_state["message"].split('\n')
     for i, line in enumerate(lines):
@@ -186,8 +216,8 @@ def draw_game():
     screen.blit(me_surface, (20, HEIGHT - 30))
 
     if game_state["matrix"]:
-        for r in range(5):
-            for col in range(5):
+        for r in range(rows):
+            for col in range(cols):
                 slot = game_state["matrix"][r][col]
                 t = SlotType(slot["type"])
                 rect = pygame.Rect(BOARD_X + col * CELL_SIZE, BOARD_Y + r * CELL_SIZE, CELL_SIZE-2, CELL_SIZE-2)
@@ -208,7 +238,7 @@ def draw_game():
                 if selected_cell == (r, col):
                     pygame.draw.rect(screen, SELECT_COLOR, rect, 3)
 
-        hand_y = BOARD_Y + 5 * CELL_SIZE + 20
+        hand_y = BOARD_Y + rows * CELL_SIZE + 20
         for i, card in enumerate(game_state["hand"]):
             rect = pygame.Rect(BOARD_X + i * (CELL_SIZE + 20), hand_y, CELL_SIZE, CELL_SIZE)
             color = MY_CARD_COLOR if selected_card_idx != i else SELECT_COLOR
@@ -219,7 +249,7 @@ def draw_game():
             card = game_state["hand"][selected_card_idx]
             dirs = [d for d in card["directions"] if d]
             
-            panel_rect = pygame.Rect(BOARD_X + 5*CELL_SIZE + 20, BOARD_Y, 150, 200)
+            panel_rect = pygame.Rect(BOARD_X + cols*CELL_SIZE + 20, BOARD_Y, 150, 200)
             pygame.draw.rect(screen, (50, 50, 50), panel_rect)
             pygame.draw.rect(screen, (200, 200, 200), panel_rect, 2)
             
@@ -273,7 +303,6 @@ def main():
             while not state_queue.empty():
                 msg = state_queue.get()
                 if msg["type"] == "DISCONNECT":
-                    # Solo marcamos desconectado si no estamos ya en game_over mostrando resultados
                     if not game_state.get("game_over"):
                         game_state["disconnected"] = True
                         game_state["turn"] = False
@@ -329,17 +358,11 @@ def main():
                     x, y = event.pos
                     
                     if current_state == "MENU":
-                        play_r, set_r, rules_r, exit_r = draw_menu()
-                        if play_r.collidepoint(x, y):
-                            game_state = get_initial_game_state()
-                            if c: 
-                                try: c.disconnect() 
-                                except: pass
-                            c = connect_client()
-                            if not c:
-                                game_state["message"] = "Error al conectar"
-                                game_state["disconnected"] = True
-                            current_state = "GAME"
+                        normal_r, extended_r, set_r, rules_r, exit_r = draw_menu()
+                        if normal_r.collidepoint(x, y):
+                            start_game_mode(extra_row=0, extra_col=0, extra_gem=0)
+                        elif extended_r.collidepoint(x, y):
+                            start_game_mode(extra_row=1, extra_col=1, extra_gem=1)
                         elif set_r.collidepoint(x, y):
                             current_state = "SETTINGS"
                         elif rules_r.collidepoint(x, y):
@@ -359,7 +382,6 @@ def main():
                         elif back.collidepoint(x, y): current_state = "MENU"
 
                     elif current_state == "GAME":
-                        # Check exit overlay
                         if game_state.get("disconnected") or game_state.get("game_over"):
                             menu_rect = draw_game()
                             if menu_rect and menu_rect.collidepoint(x, y):
@@ -370,9 +392,13 @@ def main():
                                 continue
 
                         if game_state["turn"] and not game_state.get("disconnected") and not game_state.get("game_over"):
-                            BOARD_X = WIDTH//2 - (CELL_SIZE*5)//2
-                            BOARD_Y = HEIGHT//2 - (CELL_SIZE*5)//2 - 20
-                            hand_y = BOARD_Y + 5 * CELL_SIZE + 20
+                            rows = len(game_state["matrix"]) if game_state["matrix"] else 5
+                            cols = len(game_state["matrix"][0]) if game_state["matrix"] and len(game_state["matrix"]) > 0 else 5
+                            
+                            BOARD_X = WIDTH//2 - (CELL_SIZE*cols)//2
+                            BOARD_Y = HEIGHT//2 - (CELL_SIZE*rows)//2 - 20
+                            hand_y = BOARD_Y + rows * CELL_SIZE + 20
+                            
                             for i in range(len(game_state["hand"])):
                                 rect = pygame.Rect(BOARD_X + i * (CELL_SIZE + 20), hand_y, CELL_SIZE, CELL_SIZE)
                                 if rect.collidepoint(x, y):
@@ -380,8 +406,8 @@ def main():
                                     selected_cell = None
                             
                             if selected_card_idx is not None:
-                                for r in range(5):
-                                    for c_col in range(5):
+                                for r in range(rows):
+                                    for c_col in range(cols):
                                         rect = pygame.Rect(BOARD_X + c_col * CELL_SIZE, BOARD_Y + r * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                                         if rect.collidepoint(x, y):
                                             selected_cell = (r, c_col)

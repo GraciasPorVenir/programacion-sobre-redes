@@ -3,17 +3,26 @@ from models import Slot, SlotType, TurnReq, Matrix
 
 class GameEngine:
     @staticmethod
-    def create_matrix() -> Matrix:
-        matrix = [[Slot(SlotType.BORDER) for _ in range(5)] for _ in range(5)]
-        for row, col in ((0, 0), (0, 4), (4, 4), (4, 0)):
+    # Added extended mode parameters
+    def create_matrix(extra_row: int = 0, extra_col: int = 0, extra_gem: int = 0) -> Matrix:
+        rows = 5 + extra_row
+        cols = 5 + extra_col
+        gems = 3 + extra_gem
+        
+        # Dynamic matrix generation based on rows and cols
+        matrix = [[Slot(SlotType.BORDER) for _ in range(cols)] for _ in range(rows)]
+        for row, col in ((0, 0), (0, cols - 1), (rows - 1, cols - 1), (rows - 1, 0)):
             matrix[row][col].type = SlotType.NO_SLOT
+            
         normal_coords = []
-        for row in range(1, 4):
-            for col in range(1, 4):
+        for row in range(1, rows - 1):
+            for col in range(1, cols - 1):
                 matrix[row][col].type = SlotType.NORMAL
                 normal_coords.append((row, col))
-        for row, col in random.sample(normal_coords, k=3):
+                
+        for row, col in random.sample(normal_coords, k=gems):
             matrix[row][col].type = SlotType.GEM
+            
         return matrix
 
     @staticmethod
@@ -53,8 +62,12 @@ class GameEngine:
 
     @staticmethod
     def valid_movements(matrix: Matrix) -> bool:
-        for x in range(1, 4):
-            for y in range(1, 4):
+        # Dynamic boundaries check
+        rows = len(matrix)
+        cols = len(matrix[0]) if rows > 0 else 0
+        
+        for x in range(1, rows - 1):
+            for y in range(1, cols - 1):
                 slot: Slot = matrix[x][y]
                 if slot.card is None and slot.type == SlotType.NORMAL:
                     return True
@@ -108,8 +121,12 @@ class GameEngine:
     @staticmethod
     def handle_endgame(matrix: Matrix) -> tuple[str, dict]:
         p = {}
-        for row in range(5):
-            for col in range(5):
+        # Dynamic boundaries check
+        rows = len(matrix)
+        cols = len(matrix[0]) if rows > 0 else 0
+        
+        for row in range(rows):
+            for col in range(cols):
                 slot: Slot = matrix[row][col]
                 if slot.type == SlotType.GEM and slot.card:
                     idx = slot.card.player

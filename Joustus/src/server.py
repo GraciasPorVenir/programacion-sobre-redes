@@ -28,6 +28,12 @@ class Server:
 
     def matchmake(self, p: Client):
         try:
+            init_msg = p.receive()
+            if init_msg and init_msg.get("type") == "INIT_MODE":
+                p.mode_config = init_msg
+            else:
+                p.mode_config = {"extra_row": 0, "extra_col": 0, "extra_gem": 0}
+
             with self.lock:
                 if self.wp:
                     p.name = "Jugador 2"
@@ -40,8 +46,6 @@ class Server:
                     self.wp = p
         except Exception as e:
             print(e)
-
-
 
     def _toggle_turns(
         self,
@@ -91,7 +95,12 @@ class Server:
         try:
             hands = ([Card.create(p1.name) for _ in range(3)], [Card.create(p2.name) for _ in range(3)])
             is_playing: bool = True
-            matrix: Matrix = GameEngine.create_matrix()
+            
+            e_row = max(p1.mode_config.get("extra_row", 0), p2.mode_config.get("extra_row", 0))
+            e_col = max(p1.mode_config.get("extra_col", 0), p2.mode_config.get("extra_col", 0))
+            e_gem = max(p1.mode_config.get("extra_gem", 0), p2.mode_config.get("extra_gem", 0))
+
+            matrix: Matrix = GameEngine.create_matrix(extra_row=e_row, extra_col=e_col, extra_gem=e_gem)
 
             ap, wp = p1, p2
             self._toggle_turns(ap, wp, matrix, hands)
@@ -126,8 +135,6 @@ class Server:
                     winner, scores = GameEngine.handle_endgame(matrix)
                     is_playing = False
                 new_card = Card.create(ap.name)
-                # El swap debe ocurrir ANTES del toggle para que ap sea el próximo
-                # jugador y reciba "Tu turno" correctamente
                 ap, wp = wp, ap
                 self._toggle_turns(ap, wp, matrix, (new_card, req.card), winner, scores, last_move=req, history=history)
         except Exception as e:
@@ -138,7 +145,6 @@ class Server:
             time.sleep(1)
             p1.disconnect()
             p2.disconnect()
-
 
 if __name__ == "__main__":
     Server().start("0.0.0.0", 8091)
