@@ -51,3 +51,6 @@ El motor (`engine.py`) fue diseñado para cumplir estrictamente con la dinámica
 1. La carta se apoya en una celda vacía.
 2. Si el jugador eligió empujar, toda la línea en esa dirección salta una casilla de forma simultánea.
 3. Esto permite que una carta cambie de posición desde donde fue inicialmente soltada, abriendo ventanas de oportunidad (o exponiendo cartas rivales a nuevos ángulos) de manera dinámica.
+
+## Video tutorial
+<video src=""C:programacion-sobre-redes\Joustus\src\1030.mp4"" controls width="100%"></video>
