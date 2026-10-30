@@ -53,4 +53,4 @@ El motor (`engine.py`) fue diseñado para cumplir estrictamente con la dinámica
 3. Esto permite que una carta cambie de posición desde donde fue inicialmente soltada, abriendo ventanas de oportunidad (o exponiendo cartas rivales a nuevos ángulos) de manera dinámica.
 
 ## Video tutorial
-<video src=""C:programacion-sobre-redes\Joustus\src\1030.mp4"" controls width="100%"></video>
+[![Tutorial Joustus](https://img.youtube.com/vi/xNz_1AzG2uk/0.jpg)](https://www.youtube.com/watch?v=xNz_1AzG2uk)
